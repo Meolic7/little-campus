@@ -51,6 +51,16 @@ npm.cmd run test:ui      # 使用本机 Edge 的移动尺寸浏览器测试
 
 正式发布使用 `build-android.ps1 -Release`，生成未签名 APK；需自行配置发布签名。测试版不用于应用商店发布。生产 Android 包的 HTTPS 页面和原生 HTTP 桥接支持跨域模型调用；网页预览仍受模型服务 CORS 限制。
 
+## MiMo ASR 配置
+
+使用小米 MiMo 语音识别时，在 Android 设置中填写：
+
+- 服务地址：`https://api.xiaomimimo.com/v1`
+- 模型名称：`mimo-v2.5-asr`
+- API 密钥：你的 MiMo API 密钥
+
+MiMo ASR 使用 `/v1/chat/completions` 的 `input_audio` JSON 请求，音频格式支持 WAV 和 MP3。Android 端会自动使用该协议；其他服务仍使用 OpenAI 兼容的 `/v1/audio/transcriptions` 接口。
+
 ## English
 
 A standalone Android app with Chinese/English UI and AI output selection. It keeps schedules, tasks, focus records and lecture notes on the device; no desktop server is required. Enter your own HTTPS model endpoints in Settings. Android keys use Keystore encryption.

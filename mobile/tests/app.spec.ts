@@ -83,3 +83,25 @@ test('AI task drafts require confirmation; summary follows language; audio failu
   const saved=await page.evaluate(()=>JSON.stringify(localStorage));
   expect(saved).not.toContain('not-a-real-secret');
 });
+test('MiMo ASR uses chat completions audio input',async({page})=>{
+  let requestBody:any;
+  await page.route('https://api.xiaomimimo.com/**',async route=>{
+    const headers={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization,content-type','Access-Control-Allow-Methods':'POST,OPTIONS'};
+    if(route.request().method()==='OPTIONS'){await route.fulfill({status:204,headers});return;}
+    requestBody=route.request().postDataJSON();
+    await route.fulfill({status:200,headers,contentType:'application/json',body:JSON.stringify({choices:[{message:{content:'silence'}}]})});
+  });
+  await page.goto('/');
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.getByRole('button',{name:'English',exact:true}).click();
+  const card=page.locator('section.provider').filter({has:page.getByRole('heading',{name:'Cloud speech recognition',exact:true})});
+  await card.getByLabel('Service URL (include /v1)').fill('https://api.xiaomimimo.com/v1');
+  await card.getByLabel('Model name').fill('mimo-v2.5-asr');
+  await card.getByLabel('API key',{exact:true}).fill('not-a-real-secret');
+  await card.getByRole('button',{name:'Save & test',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText('accepted a silence test');
+  expect(requestBody.model).toBe('mimo-v2.5-asr');
+  expect(requestBody.messages[0].content[0].type).toBe('input_audio');
+  expect(requestBody.messages[0].content[0].input_audio.format).toBe('wav');
+  expect(requestBody.messages[0].content[0].input_audio.data).toMatch(/^data:audio\/wav;base64,/);
+});
