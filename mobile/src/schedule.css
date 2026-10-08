@@ -1,0 +1,46 @@
+.schedule-mode{display:flex;align-items:center;border:1px solid var(--line);border-radius:9px;background:#fff;overflow:hidden;margin-right:auto}
+.schedule-mode button{display:flex;align-items:center;gap:5px;min-height:39px;padding:0 9px;color:#8a9b8f;font-size:10px}
+.schedule-mode button+button{border-left:1px solid var(--line)}
+.schedule-mode button.selected{background:#e4f0dd;color:var(--green);font-weight:700}
+.week-current{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--green);font-size:12px}
+.week-current small{font-size:9px;color:#99aa9e;font-weight:400}
+.today-section{border-color:#a5c78d;box-shadow:0 0 0 2px #e6f2df}
+.day-section h3 small{margin-left:5px;color:#a0afa4;font-weight:400}
+.today-section h3{color:var(--green)}
+.today-section .today-course{background:#e2f0d7;border-left:3px solid #639652}.today-course{box-shadow:0 3px 10px #789f5b2b}
+.schedule-grid-scroll{overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--line);border-radius:11px;background:#fff}
+.schedule-grid{min-width:670px;color:var(--ink)}
+.schedule-grid-header{display:grid;grid-template-columns:54px 1fr;position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--line)}
+.schedule-corner{display:block;border-right:1px solid var(--line);min-height:57px}
+.schedule-day-heads{display:grid;grid-template-columns:repeat(7,minmax(88px,1fr));grid-column:2/-1}
+.schedule-day-heads>div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:57px;border-right:1px solid #edf1ea;color:#8c9b91;font-size:11px}
+.schedule-day-heads>div small{font:9px 'DM Mono';color:#a2aea5}
+.schedule-day-heads>div.today-day{background:#edf6e7;color:var(--green)}
+.schedule-day-heads>div.today-day b{display:grid;place-items:center;width:30px;height:24px;border-radius:8px;background:var(--green);color:#fff}
+.schedule-grid-body{display:grid;grid-template-columns:54px 1fr}
+.schedule-time-rail{background:#fbfcf9}
+.schedule-time-rail span{display:block;height:var(--slot-height);padding:5px 5px 0 0;border-right:1px solid var(--line);border-bottom:1px solid #edf1ea;color:#9aa89e;text-align:right;font:8px 'DM Mono'}
+.schedule-day-columns{display:grid;grid-template-columns:repeat(7,minmax(88px,1fr));min-height:calc(var(--slot-height) * 1)}
+.schedule-day-column{position:relative;border-right:1px solid #edf1ea;background:#fff}
+.schedule-day-column.today-column{background:#f8fbf5}
+.schedule-slots span{display:block;height:var(--slot-height);border-bottom:1px solid #edf1ea;background:linear-gradient(to bottom,transparent 49%,#f3f6f1 50%,transparent 51%)}
+.schedule-course{position:absolute;left:4px;right:4px;z-index:1;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 6px;border:1px solid #9dc58d;border-radius:7px;background:#dcefd5;color:#3d6848;text-align:left;overflow:hidden}
+.schedule-course b{font-size:10px;line-height:1.25;overflow-wrap:anywhere}
+.schedule-course small{font-size:8px;color:#6e9075;line-height:1.2;overflow-wrap:anywhere}
+.schedule-course.today-course{background:#b9d99e;border-color:#639652;color:#285334}
+.schedule-course.today-course small{color:#477a54}
+
+.schedule-actions .schedule-mode{flex-basis:100%;margin-right:0;width:max-content;flex-grow:0}
+.schedule-mode button{flex:1;justify-content:center;min-height:44px;font-size:12px}
+.week-picker .week-current{color:var(--green);min-height:44px;min-width:110px}
+.week-picker>button{min-width:44px;min-height:44px}
+.schedule-grid-scroll:focus-visible{outline:2px solid #5e975f;outline-offset:3px}
+.schedule-course{min-height:0;min-width:0;padding:4px;max-width:calc(100% - 8px)}
+.schedule-course b,.schedule-course small{flex-shrink:0}
+
+.schedule-grid-scroll{overflow:auto;max-height:max(320px,calc(100dvh - 400px - env(safe-area-inset-bottom)))}
+.schedule-grid-header{z-index:3}
+.schedule-corner{position:sticky;left:0;z-index:4;background:#fbfcf9}
+.schedule-time-rail{position:sticky;left:0;z-index:2}
+.schedule-course b{font-size:11px}
+.schedule-course small{font-size:9px}

@@ -16,6 +16,7 @@ export type Update=(fn:(previous:Data)=>Data)=>void;
 export type Run=(fn:()=>Promise<void>)=>Promise<void>;
 export default function App() {
   const [data,setData]=useState(initialData),[providers,setProviders]=useState<Providers>(emptyProviders),[choice,setChoice]=useState<LocaleChoice>('system'),[page,setPage]=useState<Page>('home');
+  const [scheduleEntry,setScheduleEntry]=useState(0);
   const [ready,setReady]=useState(false),[fatal,setFatal]=useState(false),[notice,setNotice]=useState('');const hydrated=useRef(false);
   const language=resolveLanguage(choice),t=(key:Key)=>tr(language,key);
   const notify=(message:string)=>setNotice(message);
@@ -28,7 +29,7 @@ export default function App() {
   const localeChange=(v:LocaleChoice)=>{setChoice(v);saveLocale(v).catch(()=>notify(t('storageError')));};
   const changeProviders=async(p:Providers)=>{await saveProviders(p);setProviders(p);};
   const activeRecording=data.notes.some(n=>n.recording);
-  const navigate=(p:Page)=>{if(activeRecording&&p!=='notes'){notify(t('sessionBusy'));return;}setPage(p);};
+  const navigate=(p:Page)=>{if(activeRecording&&p!=='notes'){notify(t('sessionBusy'));return;}if(p==='schedule')setScheduleEntry(n=>n+1);setPage(p);};
   useEffect(()=>{
     if(!native)return;
     const listener=NativeApp.addListener('backButton',()=>{
@@ -47,7 +48,7 @@ export default function App() {
     <div className="stats"><div><span><Clock3 size={16}/>{t('focusMinutes')}</span><b>{Math.floor(data.records.filter(r=>localDate(new Date(r.date))===localDate()).reduce((s,r)=>s+r.seconds,0)/60)}<small> min</small></b></div><div><span><Check size={16}/>{t('pending')}</span><b>{data.tasks.filter(x=>!x.done).length}</b></div><div><span><Sprout size={16}/>{t('plants')}</span><b>{data.records.filter(r=>r.completed).length}</b></div></div>
     <div className="section-heading"><h2>{t('todayClasses')}</h2><button onClick={()=>navigate('schedule')}>{t('all')}<ArrowUpRight size={15}/></button></div><div className="home-courses">{data.courses.filter(c=>c.day===(new Date().getDay()||7)&&occurs(c,teachingWeek(data.term.monday),data.term.weeks)).map(c=><article className="class-card" key={c.id}><time>{c.start}<small>{c.end}</small></time><div><b>{c.name}</b><p>{c.location||'—'} · {c.teacher||'—'}</p></div></article>)}{!data.courses.some(c=>c.day===(new Date().getDay()||7)&&occurs(c,teachingWeek(data.term.monday),data.term.weeks))&&<Empty>{t('noClasses')}</Empty>}</div>
     <div className="section-heading"><h2>{t('latest')}</h2><button onClick={()=>navigate('notes')}>{t('all')}<ArrowUpRight size={15}/></button></div>{data.notes.length?data.notes.slice(0,3).map(n=><button className="note-row" key={n.id} onClick={()=>navigate('notes')}><span className="note-icon"><Headphones size={19}/></span><div><b>{n.title}</b><small>{new Date(n.created).toLocaleDateString(language==='zh'?'zh-CN':'en-US')}</small></div><ArrowUpRight size={18}/></button>):<Empty>{t('emptyNotes')}</Empty>}</>}
-    {page==='schedule'&&<Schedule data={data} update={setData} providers={providers} run={run}/>}
+    {page==='schedule'&&<Schedule entry={scheduleEntry} data={data} update={setData} providers={providers} run={run}/>}
     {page==='tasks'&&<Tasks data={data} update={setData} providers={providers} run={run} focusTask={id=>{sessionStorage.setItem('focusTask',id);navigate('focus');}}/>}
     {page==='focus'&&<Focus data={data} update={setData} notify={notify}/>}
     <div hidden={page!=='notes'}><Notes data={data} update={setData} providers={providers} run={run} notify={notify}/></div>
