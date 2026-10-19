@@ -2,4 +2,5 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 import './schedule.css';
+import './notes.css';
 createRoot(document.getElementById('root')!).render(<App/>);

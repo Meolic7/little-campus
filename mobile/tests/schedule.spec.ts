@@ -108,7 +108,7 @@ test('English view labels and updated term locate current week',async({page})=>{
   await page.getByRole('button',{name:'Schedule',exact:true}).click();
   await expect(page.getByRole('button',{name:'Week grid',exact:true})).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'Term settings',exact:true}).click();
-  await page.getByLabel('Monday of teaching week 1').fill('2026-09-07');
+  await page.getByLabel('First day of teaching week 1 (Mon)').fill('2026-09-07');
   await page.getByRole('button',{name:'Save',exact:true}).click();
   await expect(page.locator('.week-current')).toContainText('Week 5');
   await expect(page.locator('.today-day')).toContainText('10-08');

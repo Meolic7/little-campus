@@ -1,10 +1,10 @@
 import { useContext, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Grid2X2, List, Plus, Sparkles, Trash2 } from 'lucide-react';
-import type { Course, Data, Providers } from './types';
+import type { Course, Data, Providers, WeekStart } from './types';
 import { uid } from './types';
 import type { Run, Update } from './App';
 import { LocaleContext, useText, weekday } from './i18n';
-import { clashes, localDate, occurs, teachingWeek, validCourse } from './core';
+import { clashes, courseDate, localDate, occurs, teachingDays, teachingWeek, validCourse, weekStartOffset } from './core';
 import { chat, cleanHtml, courseResults, readMaterial } from './ai';
 import { Button, Busy, Empty, Field, Header, Modal } from './ui';
 const freshCourse=():Course=>({id:uid(),name:'',teacher:'',location:'',day:1,start:'08:00',end:'08:45',weeks:'1-16',parity:'all'});
@@ -16,7 +16,7 @@ export function Schedule({entry,data,update,providers,run}:{entry:number;data:Da
   const t=useText(),{language}=useContext(LocaleContext);
   const [now,setNow]=useState(()=>new Date());
   const today=localDate(now),currentDay=now.getDay()||7;
-  const actualWeek=teachingWeek(data.term.monday,now);
+  const actualWeek=teachingWeek(data.term.monday,now,data.term.weekStartsOn);
   const currentWeek=Math.min(data.term.weeks,Math.max(1,actualWeek));
   useEffect(()=>{
     const refresh=()=>setNow(new Date());
@@ -25,20 +25,19 @@ export function Schedule({entry,data,update,providers,run}:{entry:number;data:Da
     return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);};
   },[]);
   const [week,setWeek]=useState(currentWeek),[mode,setMode]=useState<'grid'|'list'>('grid'),[edit,setEdit]=useState<Course|null>(null),[term,setTerm]=useState<Data['term']|null>(null),[importing,setImporting]=useState(false),[accept,setAccept]=useState(false);
-  useEffect(()=>setWeek(currentWeek),[entry,currentWeek,data.term.monday,data.term.weeks]);
+  useEffect(()=>setWeek(currentWeek),[entry,currentWeek,data.term.monday,data.term.weeks,data.term.weekStartsOn]);
   const warnings=edit?clashes([edit],data.courses,data.term.weeks):[];
   const save=()=>run(async()=>{if(!edit||!validCourse(edit,data.term.weeks))throw Error('courseInvalid');if(warnings.length&&!accept)return;update(d=>({...d,courses:[...d.courses.filter(c=>c.id!==edit.id),edit]}));setEdit(null);});
-  const weekDays=Array.from({length:7},(_,i)=>i+1);
-  const weekStart=new Date(`${data.term.monday}T12:00:00`);weekStart.setDate(weekStart.getDate()+(week-1)*7);
-  const dateForDay=(day:number)=>{const date=new Date(weekStart);date.setDate(date.getDate()+day-1);return date;};
-  const dateRange=`${localDate(dateForDay(1)).slice(5)} – ${localDate(dateForDay(7)).slice(5)}`;
+  const weekDays=teachingDays(data.term.weekStartsOn);
+  const dateForDay=(day:number)=>courseDate(data.term,week,day);
+  const dateRange=`${localDate(dateForDay(weekDays[0])).slice(5)} – ${localDate(dateForDay(weekDays[6])).slice(5)}`;
   const openCourse=(course:Course)=>{setEdit({...course});setAccept(false);};
   const renderList=()=> <div className="week-agenda">{weekDays.map(day=>{const list=data.courses.filter(c=>c.day===day&&occurs(c,week,data.term.weeks)).sort((a,b)=>a.start.localeCompare(b.start));return <section key={day} className={`day-section ${localDate(dateForDay(day))===today?'today-section':''}`}><h3 aria-current={localDate(dateForDay(day))===today?'date':undefined}>{weekday(language,day)} <small>{localDate(dateForDay(day)).slice(5)}</small></h3><div>{list.map(c=><button className={`class-card ${localDate(dateForDay(day))===today?'today-course':''}`} key={c.id} onClick={()=>openCourse(c)}><time>{c.start}<small>{c.end}</small></time><div><b>{c.name}</b><p>{c.location||'—'} · {c.teacher||'—'}</p></div></button>)}{!list.length&&<span className="no-class">—</span>}</div></section>;})}</div>;
   const renderGrid=()=> <TimetableGrid courses={data.courses} maxWeeks={data.term.weeks} week={week} weekDays={weekDays} currentDay={currentDay} activeWeek={week===actualWeek} dateForDay={dateForDay} language={language} openCourse={openCourse}/>;
   return <section className="schedule-page"><Header title={t('schedule')} subtitle={`${data.term.name||t('tagline')} · ${t('week')} ${week} · ${dateRange}`}><button className="icon-button" aria-label={t('term')} onClick={()=>setTerm({...data.term})}><CalendarDays size={21}/></button></Header><div className="actions schedule-actions"><div className="schedule-mode" role="group" aria-label={t('scheduleMode')}><button className={mode==='grid'?'selected':''} aria-pressed={mode==='grid'} onClick={()=>setMode('grid')}><Grid2X2 size={15}/>{t('gridView')}</button><button className={mode==='list'?'selected':''} aria-pressed={mode==='list'} onClick={()=>setMode('list')}><List size={15}/>{t('listView')}</button></div><Button onClick={()=>setImporting(true)}><Sparkles size={16}/>{t('import')}</Button><button className="button secondary" aria-label={t('addCourse')} onClick={()=>{setEdit(freshCourse());setAccept(false);}}><Plus size={16}/>{t('add')}</button></div><div className="week-picker"><button aria-label={t('prev')} disabled={week===1} onClick={()=>setWeek(week-1)}><ChevronLeft/></button><button className="week-current" aria-label={t('returnCurrentWeek')} onClick={()=>setWeek(currentWeek)}>{t('week')} {week}<small>{week===actualWeek?t('currentWeek'):dateRange}</small></button><button aria-label={t('next')} disabled={week===data.term.weeks} onClick={()=>setWeek(week+1)}><ChevronRight/></button></div>
     {mode==='grid'?renderGrid():renderList()}
     {edit&&<Modal title={t('edit')} close={()=>setEdit(null)}><CourseFields course={edit} set={setEdit}/>{warnings.length>0&&<div className="warning">{t('conflicts')}{warnings.join(' / ')}<label><input type="checkbox" checked={accept} onChange={e=>setAccept(e.target.checked)}/>{t('acceptConflicts')}</label></div>}<div className="actions"><Button disabled={warnings.length>0&&!accept} onClick={save}>{t('save')}</Button>{data.courses.some(c=>c.id===edit.id)&&<Button secondary onClick={()=>{update(d=>({...d,courses:d.courses.filter(c=>c.id!==edit.id)}));setEdit(null);}}><Trash2 size={16}/>{t('delete')}</Button>}</div></Modal>}
-    {term&&<Modal title={t('term')} close={()=>setTerm(null)}><Field label={t('termName')}><input value={term.name} onChange={e=>setTerm({...term,name:e.target.value})}/></Field><Field label={t('monday')}><input type="date" value={term.monday} onChange={e=>setTerm({...term,monday:e.target.value})}/></Field><Field label={t('termWeeks')}><input type="number" min="1" max="60" value={term.weeks} onChange={e=>setTerm({...term,weeks:+e.target.value})}/></Field><Button onClick={()=>run(async()=>{if(new Date(term.monday+'T12:00:00').getDay()!==1||!Number.isInteger(term.weeks)||term.weeks<1||term.weeks>60)throw Error('mondayInvalid');if(data.courses.some(c=>!validCourse(c,term.weeks)))throw Error('courseInvalid');update(d=>({...d,term}));setWeek(Math.min(week,term.weeks));setTerm(null);})}>{t('save')}</Button></Modal>}
+    {term&&<Modal title={t('term')} close={()=>setTerm(null)}><Field label={t('termName')}><input value={term.name} onChange={e=>setTerm({...term,name:e.target.value})}/></Field><Field label={t('weekStartsOn')}><select value={term.weekStartsOn??1} onChange={e=>setTerm({...term,weekStartsOn:+e.target.value as WeekStart})}>{teachingDays().map(day=><option key={day} value={day}>{weekday(language,day)}</option>)}</select></Field><Field label={`${t('termStart')} (${weekday(language,term.weekStartsOn??1)})`}><input type="date" value={term.monday?localDate(courseDate(term,1,term.weekStartsOn??1)):''} onChange={e=>{const date=new Date(`${e.target.value}T12:00:00`);date.setDate(date.getDate()-weekStartOffset(term.weekStartsOn));setTerm({...term,monday:e.target.value?localDate(date):''});}}/></Field><Field label={t('termWeeks')}><input type="number" min="1" max="60" value={term.weeks} onChange={e=>setTerm({...term,weeks:+e.target.value})}/></Field><Button onClick={()=>run(async()=>{if(new Date(term.monday+'T12:00:00').getDay()!==1||!Number.isInteger(term.weeks)||term.weeks<1||term.weeks>60)throw Error('termInvalid');if(data.courses.some(c=>!validCourse(c,term.weeks)))throw Error('courseInvalid');update(d=>({...d,term}));setWeek(Math.min(week,term.weeks));setTerm(null);})}>{t('save')}</Button></Modal>}
     {importing&&<Import data={data} providers={providers} run={run} close={()=>setImporting(false)} save={courses=>{update(d=>({...d,courses:[...d.courses,...courses]}));setImporting(false);}}/>}</section>;
 }
 
