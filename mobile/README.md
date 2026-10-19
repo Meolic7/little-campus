@@ -13,13 +13,17 @@
 3. 语言/视觉使用兼容的 `POST /v1/chat/completions`；语音使用 `POST /v1/audio/transcriptions`，接受 multipart 文件并返回 `{ "text": "..." }`。服务必须支持这些协议；接口调用由你自己的账号计费。
 4. 无模型配置时仍可使用手动课表、待办、番茄钟和手动课堂笔记。
 
+课表的 **学期设置 / Term settings** 支持选择周一至周日中的任意一天作为“每周第一天”，并填写第 1 教学周对应的首日日期。所选首日计入新一教学周，周次、单双周、今日课程和两种课表视图会一起调整。已有数据默认沿用周一，无需重新导入课程。
+
 ## 功能边界
 
-- **课表**：周次与单双周、手动增删改、冲突提示；HTML/TXT/图片/PDF 导入后编辑确认。课表文件上限 10 MB、PDF 最多 10 页。PDF 会渲染为图片以保留列布局，需要视觉模型。HTML 不执行脚本、不加载外部图片。
+- **课表**：默认周视图按时间排列课程，七天同屏显示，支持切换原有按天列表；进入时自动定位当前教学周、高亮当天日期和课程，可浏览前后周并点击周次按钮返回当前周。周视图允许小范围纵向滚动，日期表头与时间轴固定；点击课程编辑。周次与单双周、手动增删改、冲突提示；HTML/TXT/图片/PDF 导入后编辑确认。课表文件上限 10 MB、PDF 最多 10 页。PDF 会渲染为图片以保留列布局，需要视觉模型。HTML 不执行脚本、不加载外部图片。
 - **任务**：优先级、截止日期、备注、完成状态；AI 拆解或总结中的候选任务编辑确认后才加入列表。
 - **专注**：自定义专注/休息时长，暂停和重启恢复，完成一轮种一棵像素树；下一阶段手动开始。没有后台/锁屏响铃服务。
-- **课堂**：Android 原生 PCM 录音，按停顿或最长 12 秒切段；先保存 WAV，再串行调用云端 ASR。网络慢时排队，失败片段可重试、回听。切到后台或锁屏会停止录音并保存尾段；最多连续录制 4 小时。系统强制终止时可恢复已提交的音频块，尚在缓冲区的最后几秒可能丢失。
+- **课堂**：Android 原生 PCM 录音持续写入一个 WAV 文件，不按时长或停顿分块。停止后先保存整段录音，再整段调用云端 ASR；失败可重试、回听。切到后台或锁屏会结束并保存整段录音；最多连续录制 4 小时。应用进程意外退出后，下次启动会修复已写入音频的 WAV 头并恢复该录音。
+- **阅读与批注**：原始转录支持长按或拖动选中文字；选中后可记笔记，或发送所选文字及相邻上下文向已配置的语言模型提问。笔记与提问通过原文虚线下划线和虚线卡片显示，支持回看、编辑笔记及删除。AI 回答默认只保留在提问记录，点击“加入笔记”后才标记为笔记；数据随课堂本地保存，兼容已有课堂。
 - **音频导入**：WAV/MP3/M4A/WebM，最多 20 MB。上传文件不在手机转码或拆分，仍受服务商文件格式和大小限制。
+- **整段转录限制**：单次转录音频上限为 20 MB；MiMo ASR 还要求 Base64 后不超过 10 MB，且只接受 WAV/MP3，参见[官方语音识别说明](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/multimodal-understanding/Speech-Recognition)。超限会保留原音频供回听并提示原因，不会自动分块；录音保存上限与转录上传上限分别计算。
 - **笔记**：原始转录与编辑稿分开保存；长文本分段总结后归并；分段总结进度保存。音频和整条笔记可以分别删除。
 - **本机模型**：Android 版不运行电脑端 faster-whisper；语音采用你配置的云端兼容接口。知识库和研究助手仅显示未来计划。
 
@@ -65,6 +69,6 @@ MiMo ASR 使用 `/v1/chat/completions` 的 `input_audio` JSON 请求，音频格
 
 A standalone Android app with Chinese/English UI and AI output selection. It keeps schedules, tasks, focus records and lecture notes on the device; no desktop server is required. Enter your own HTTPS model endpoints in Settings. Android keys use Keystore encryption.
 
-Recording is **foreground only**. Leaving the app stops recording and preserves completed chunks; audio is transcribed through your cloud provider. Uploaded audio is limited to 20 MB. Local desktop ASR is not included. Uninstalling deletes local data.
+Recording is **foreground only**. Leaving the app saves one complete WAV; transcription starts after recording stops. Select transcript text to annotate or ask AI. Dashed marks link passages to saved notes and question history; answers join notes only when you choose. Uploaded audio is limited to 20 MB (MiMo also limits Base64 payloads to 10 MB). Oversized recordings stay available for playback without automatic splitting. Local desktop ASR is not included. Uninstalling deletes local data.
 
 Build with Node 20+, JDK 21 and Android SDK 35: `npm ci`, then `build-android.ps1`. Install the resulting debug APK from `releases/`. Release APKs require your own signing configuration.

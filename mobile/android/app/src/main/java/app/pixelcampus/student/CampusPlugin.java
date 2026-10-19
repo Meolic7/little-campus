@@ -19,11 +19,9 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import javax.crypto.Cipher;
@@ -72,7 +70,20 @@ public class CampusPlugin extends Plugin {
         } catch(Exception e) {call.reject("storageError");}
     }
     @PluginMethod public void getRecovery(PluginCall call) {
-        try{call.resolve(new JSObject(prefs().getString("recording","{}")));}catch(Exception e){call.reject("storageError");}
+        try {
+            JSONObject journal=new JSONObject(prefs().getString("recording","{}"));
+            String id=journal.optString("id"),relative=journal.optString("audio");
+            // Repair a single unfinished WAV after process death. Old chunk journals remain readable.
+            if(!running&&(recorderThread==null||!recorderThread.isAlive())&&id.matches("[a-fA-F0-9-]{36}")&&relative.equals("audio/"+id+".wav")) {
+                File target=new File(getContext().getFilesDir(),relative);
+                if(target.exists()&&target.length()>44) {
+                    long samples=WavRecording.recover(target);
+                    journal.put("segments",new JSONArray().put(recordingEntry(relative,samples)));
+                    if(!prefs().edit().putString("recording",journal.toString()).commit())throw new IOException();
+                }
+            }
+            call.resolve(new JSObject(journal.toString()));
+        } catch(Exception e){call.reject("storageError");}
     }
     @PluginMethod public void clearRecovery(PluginCall call) {
         try{JSONObject journal=new JSONObject(prefs().getString("recording","{}"));if(journal.optString("id").equals(call.getString("id")))prefs().edit().remove("recording").commit();call.resolve();}catch(Exception e){call.reject("storageError");}
@@ -97,36 +108,37 @@ public class CampusPlugin extends Plugin {
         } catch(Exception e){running=false;call.reject("micDenied");}
     }
     private void capture(AudioRecord recorder,String id) {
-        byte[] block=new byte[3200];ByteArrayOutputStream pcm=new ByteArrayOutputStream();
-        JSONArray entries=new JSONArray();long samples=0;int sequence=0;boolean failed=false;
+        byte[] block=new byte[3200];long samples=0;String error=null;
+        String relative="audio/"+id+".wav";File target=new File(getContext().getFilesDir(),relative);
         try {
-            while(running&&samples<RATE*60L*60*4) {
-                int count=recorder.read(block,0,block.length);
-                if(count<0)throw new Exception();if(count==0)continue;
-                pcm.write(block,0,count);
-                double square=0;for(int i=0;i+1<count;i+=2){short s=(short)((block[i]&255)|(block[i+1]<<8));square+=(double)s*s;}
-                boolean silence=Math.sqrt(square/Math.max(1,count/2))<230;
-                if(pcm.size()>=RATE*2*12 || (pcm.size()>=RATE*2*5&&silence)) {
-                    byte[] bytes=pcm.toByteArray();persistChunk(id,sequence++,samples,bytes,entries);samples+=bytes.length/2;pcm.reset();
+            File dir=target.getParentFile();if(!dir.exists()&&!dir.mkdirs())throw new IOException();
+            try(WavRecording recording=new WavRecording(target)) {
+                JSONObject journal=new JSONObject().put("id",id).put("audio",relative).put("segments",new JSONArray());
+                if(!prefs().edit().putString("recording",journal.toString()).commit())throw new IOException();
+                while(running&&samples<RATE*60L*60*4) {
+                    int count=recorder.read(block,0,block.length);
+                    if(count<0)throw new IllegalStateException();if(count==0)continue;
+                    recording.append(block,count);samples=recording.samples();
                 }
             }
-        } catch(Exception e){failed=true;}
+        } catch(Exception e){error=e instanceof IOException?"storageError":"micDenied";}
         finally {
-            try{if(pcm.size()>0)persistChunk(id,sequence,samples,pcm.toByteArray(),entries);}catch(Exception e){failed=true;}
+            try {
+                if(target.exists()&&target.length()>44) {
+                    samples=WavRecording.recover(target);
+                    JSObject entry=recordingEntry(relative,samples);
+                    JSONObject journal=new JSONObject().put("id",id).put("audio",relative).put("segments",new JSONArray().put(entry));
+                    if(!prefs().edit().putString("recording",journal.toString()).commit())throw new IOException();
+                    // Emit only once, after stopping, so the entire recording is one transcription request.
+                    notifyListeners("recordingReady",entry);
+                }
+            } catch(Exception e){error="storageError";}
             try{recorder.stop();}catch(Exception ignored){}recorder.release();running=false;
-            JSObject event=new JSObject();if(failed)event.put("error","micDenied");notifyListeners("recordingStopped",event);
+            JSObject event=new JSObject();if(error!=null)event.put("error",error);notifyListeners("recordingStopped",event);
         }
     }
-    private void persistChunk(String id,int seq,long start,byte[] pcm,JSONArray entries) throws Exception {
-        String relative="audio/"+id+"-"+seq+".wav";
-        File target=new File(getContext().getFilesDir(),relative);File dir=target.getParentFile();if(!dir.exists()&&!dir.mkdirs())throw new Exception();
-        ByteBuffer header=ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN);
-        header.put("RIFF".getBytes(StandardCharsets.US_ASCII)).putInt(pcm.length+36).put("WAVEfmt ".getBytes(StandardCharsets.US_ASCII)).putInt(16).putShort((short)1).putShort((short)1).putInt(RATE).putInt(RATE*2).putShort((short)2).putShort((short)16).put("data".getBytes(StandardCharsets.US_ASCII)).putInt(pcm.length);
-        File tmp=new File(target.getPath()+".tmp");try(FileOutputStream out=new FileOutputStream(tmp)){out.write(header.array());out.write(pcm);out.getFD().sync();}
-        if(!tmp.renameTo(target))throw new Exception();
-        JSObject entry=new JSObject().put("audio",relative).put("start",start/(double)RATE).put("seconds",pcm.length/(RATE*2.0));entries.put(entry);
-        if(!prefs().edit().putString("recording",new JSONObject().put("id",id).put("segments",entries).toString()).commit())throw new Exception();
-        notifyListeners("audioChunk",entry);
+    private JSObject recordingEntry(String relative,long samples) {
+        return new JSObject().put("audio",relative).put("start",0).put("seconds",samples/(double)RATE);
     }
     @PluginMethod public void stopRecording(PluginCall call) {
         running=false;Thread thread=recorderThread;

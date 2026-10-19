@@ -61,8 +61,9 @@ async function transcribeMimo(provider:Provider,audio:Blob):Promise<string> {
     return text.trim();
   }catch(e){if(['requestFailed','invalidResponse','unsupported'].includes((e as Error).message))throw e;throw Error('networkError');}
 }
+export function transcriptionLimit(provider:Provider) {return isMimoAsr(provider)?7_500_000:20*1024*1024;}
 export async function transcribe(provider:Provider,audio:Blob):Promise<string> {
-  if(audio.size>20*1024*1024)throw Error('fileTooLarge');
+  if(audio.size>transcriptionLimit(provider))throw Error('speechTooLarge');
   if(isMimoAsr(provider))return transcribeMimo(provider,audio);
   const url=endpoint(provider,'/audio/transcriptions');
   const form=new FormData();form.append('model',provider.model);form.append('response_format','json');

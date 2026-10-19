@@ -11,7 +11,7 @@ interface CampusPlugin {
   stopRecording(): Promise<void>;
   getRecovery(): Promise<{id?:string;segments?:{audio:string;start:number;seconds:number}[]}>;
   clearRecovery(options:{id:string}): Promise<void>;
-  addListener(event:'audioChunk', fn:(data:{audio:string;seconds:number;start:number})=>void): Promise<PluginListenerHandle>;
+  addListener(event:'recordingReady', fn:(data:{audio:string;seconds:number;start:number})=>void): Promise<PluginListenerHandle>;
   addListener(event:'recordingStopped', fn:(data:{error?:string})=>void): Promise<PluginListenerHandle>;
 }
 export const Campus = registerPlugin<CampusPlugin>('Campus');
@@ -46,11 +46,19 @@ export async function storeAudio(id:string, data:Blob|string, extension='wav'):P
   await Filesystem.writeFile({path,data:base64,directory:Directory.Data,recursive:true});
   return path;
 }
-export async function readAudio(path:string):Promise<Blob> {
+export async function readAudio(path:string,maxBytes=Infinity):Promise<Blob> {
+  if(Number.isFinite(maxBytes)) {
+    const file=await Filesystem.stat({path,directory:Directory.Data});
+    if(file.size>maxBytes)throw Error('speechTooLarge');
+  }
   const r=await Filesystem.readFile({path,directory:Directory.Data});
   if(r.data instanceof Blob)return r.data;
   const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0));
   return new Blob([bytes],{type:path.endsWith('.wav')?'audio/wav':path.endsWith('.mp3')?'audio/mpeg':path.endsWith('.m4a')?'audio/mp4':'audio/webm'});
+}
+export async function nativeAudioUrl(path:string):Promise<string> {
+  const {uri}=await Filesystem.getUri({path,directory:Directory.Data});
+  return Capacitor.convertFileSrc(uri);
 }
 export const removeAudio=(path:string)=>Filesystem.deleteFile({path,directory:Directory.Data});
 export function blobBase64(blob:Blob):Promise<string> {return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob);});}

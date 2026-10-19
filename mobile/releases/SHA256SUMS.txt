@@ -1,1 +1,1 @@
-0c2a998eb9eab33f610eacb05c0b08a4c41ae0b46784ec4a33c1ec97183937a7  pixel-campus-debug.apk
+e6de10e54e3f5e93b920f0d5cb6e1bd2ad5188a887e7b32ed502c754fd0f5c39  pixel-campus-debug.apk

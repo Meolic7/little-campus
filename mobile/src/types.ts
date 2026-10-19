@@ -7,10 +7,14 @@ export type Task = { id: string; title: string; notes: string; due: string; prio
 export type Course = { id: string; name: string; teacher: string; location: string; day: number; start: string; end: string; weeks: string; parity: 'all'|'odd'|'even' };
 export type Segment = { id: string; start: number; end: number; text: string; status: 'queued'|'working'|'done'|'error'; error?: string; audio: string };
 export type Summary = { abstract: string; points: string[]; review: string[]; tasks: {title: string; due?: string}[] };
-export type Note = { id: string; title: string; created: string; seconds: number; segments: Segment[]; edited: string; summary?: Summary; recording: boolean; partials?: Summary[] };
+export type Annotation = { id: string; start: number; end: number; quote: string; kind: 'note'|'question'; text: string; question?: string; answer?: string; saved: boolean; created: string };
+export type Note = { id: string; title: string; created: string; seconds: number; segments: Segment[]; edited: string; summary?: Summary; recording: boolean; partials?: Summary[]; annotations?: Annotation[] };
 export type Timer = { id: string; phase: 'focus'|'rest'; status: 'running'|'paused'|'completed'|'stopped'; focus: number; rest: number; remaining: number; deadline: number; task: string };
 export type FocusRecord = { id: string; seconds: number; completed: boolean; date: string; task: string };
-export type Data = { version: 1; tasks: Task[]; courses: Course[]; notes: Note[]; records: FocusRecord[]; timer: Timer | null; term: {name: string; monday: string; weeks: number} };
+export type WeekStart = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+// Keep the first week's Monday as the stored anchor for compatibility with existing data.
+export type Term = {name: string; monday: string; weeks: number; weekStartsOn?: WeekStart};
+export type Data = { version: 1; tasks: Task[]; courses: Course[]; notes: Note[]; records: FocusRecord[]; timer: Timer | null; term: Term };
 export const emptyProvider = (): Provider => ({url: '', model: '', key: '', timeout: 120});
 export const emptyProviders = (): Providers => ({text: emptyProvider(), vision: emptyProvider(), speech: emptyProvider()});
 export const uid = () => crypto.randomUUID();

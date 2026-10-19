@@ -1,12 +1,28 @@
-import type { Course, Data, FocusRecord, Timer } from './types';
+import type { Course, Data, FocusRecord, Term, Timer, WeekStart } from './types';
 export function initialData(now = new Date()): Data {
   const monday = new Date(now); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  return {version: 1, tasks: [], courses: [], notes: [], records: [], timer: null, term: {name: '', monday: localDate(monday), weeks: 20}};
+  return {version: 1, tasks: [], courses: [], notes: [], records: [], timer: null, term: {name: '', monday: localDate(monday), weeks: 20, weekStartsOn: 1}};
 }
 export function localDate(date = new Date()): string { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
-export function teachingWeek(monday: string, now = new Date()): number {
+// The stored Monday belongs to week 1; its first day is on or before that Monday.
+export function weekStartOffset(weekStartsOn: WeekStart = 1): number {
+  return -((8-weekStartsOn)%7);
+}
+export function teachingWeek(monday: string, now = new Date(), weekStartsOn: WeekStart = 1): number {
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const [y,m,d] = monday.split('-').map(Number); return Math.floor((today-Date.UTC(y,m-1,d))/604800000)+1;
+  const [y,m,d] = monday.split('-').map(Number);
+  const start = Date.UTC(y,m-1,d) + weekStartOffset(weekStartsOn)*86400000;
+  return Math.floor((today-start)/604800000)+1;
+}
+export function teachingDays(weekStartsOn: WeekStart = 1): WeekStart[] {
+  return Array.from({length:7},(_,i)=>((weekStartsOn-1+i)%7+1) as WeekStart);
+}
+export function courseDate(term: Term, week: number, day: number): Date {
+  const date = new Date(`${term.monday}T12:00:00`);
+  const firstDay = term.weekStartsOn??1;
+  const offset = weekStartOffset(firstDay)+(day-firstDay+7)%7;
+  date.setDate(date.getDate()+(week-1)*7+offset);
+  return date;
 }
 export function parseWeeks(value: string, max: number): number[] {
   const weeks = new Set<number>();
